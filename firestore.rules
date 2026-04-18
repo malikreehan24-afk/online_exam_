@@ -1,0 +1,80 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Entity Validations ---
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email']) &&
+             data.uid == request.auth.uid &&
+             data.email is string && data.email.size() <= 256;
+    }
+
+    function isValidSession(data) {
+      return data.keys().hasAll(['userId', 'startTime', 'status']) &&
+             data.userId == request.auth.uid &&
+             data.status in ['active', 'completed', 'cancelled'] &&
+             data.startTime is timestamp;
+    }
+
+    function isValidViolation(data) {
+      return data.keys().hasAll(['sessionId', 'timestamp', 'type']) &&
+             data.sessionId is string &&
+             data.type in ['no_face', 'multiple_faces', 'suspicious_movement', 'audio_alert'] &&
+             data.timestamp == request.time;
+    }
+
+    // --- Collection Routes ---
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming()) &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'lastLogin']);
+    }
+
+    match /sessions/{sessionId} {
+      allow get: if isOwner(existing().userId);
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidSession(incoming()) && isValidId(sessionId);
+      allow update: if isOwner(existing().userId) && isValidSession(incoming()) &&
+                    // Action: Change status
+                    (existing().status == 'active' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'integrityScore', 'endTime']));
+    }
+
+    match /sessions/{sessionId}/violations/{violationId} {
+      function canWriteViolation() {
+        return get(/databases/$(database)/documents/sessions/$(sessionId)).data.userId == request.auth.uid;
+      }
+      
+      allow list, get: if isSignedIn() && canWriteViolation();
+      allow create: if isSignedIn() && canWriteViolation() && isValidViolation(incoming()) && isValidId(violationId);
+      // No updates or deletes allowed for violations (audit trail)
+    }
+  }
+}

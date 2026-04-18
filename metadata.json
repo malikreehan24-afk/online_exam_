@@ -1,0 +1,6 @@
+{
+  "name": "ProctorGuard AI",
+  "description": "Secure AI-powered online examination monitoring with face detection and integrity logging.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": []
+}

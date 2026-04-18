@@ -1,0 +1,56 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "lastLogin": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "ExamSession": {
+      "title": "Exam Session",
+      "description": "A proctoring session for an exam.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "startTime": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["active", "completed", "cancelled"] },
+        "integrityScore": { "type": "number" }
+      },
+      "required": ["userId", "startTime", "status"]
+    },
+    "Violation": {
+      "title": "Violation",
+      "description": "A logged violation during an exam.",
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["no_face", "multiple_faces", "suspicious_movement", "audio_alert"] },
+        "description": { "type": "string" },
+        "snapshotUrl": { "type": "string" }
+      },
+      "required": ["sessionId", "timestamp", "type"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles."
+    },
+    "/sessions/{sessionId}": {
+      "schema": "ExamSession",
+      "description": "Proctoring sessions."
+    },
+    "/sessions/{sessionId}/violations/{violationId}": {
+      "schema": "Violation",
+      "description": "Violations logged during a session."
+    }
+  }
+}
